@@ -1,0 +1,32 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse / VS Code
+.classpath
+.project
+.settings/
+.vscode/
+
+# Local runtime data & logs
+data/
+logs/
+*.log
+*.db
+*.mv.db
+*.trace.db
+
+# OS files
+.DS_Store
+Thumbs.db
