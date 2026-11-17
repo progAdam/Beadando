@@ -41,11 +41,4 @@ java -jar target/rush-hour-1.0-SNAPSHOT-jar-with-dependencies.jar utvonal/sajat-
   - `HELP` – súgó
   - `QUIT` – kilépés
 
-## Javasolt GitHub commit sorrend
-Ha fokozatosan szeretnéd feltölteni a repóba:
-1. `pom.xml`, `checkstyle.xml`, `.gitignore`, `README.md`, `Main.java`
-2. `model/*` (immutable Value Object osztályok)
-3. `service/MoveValidator.java`, `service/GameEngine.java`, `service/RandomAiPlayer.java`
-4. `io/BoardFileManager.java`, `io/XmlStateManager.java`, `src/main/resources/*`
-5. `persistence/HighScoreDao.java`, `ui/*`, `service/Game.java`
-6. `src/test/java/...` (egységtesztek)
+
