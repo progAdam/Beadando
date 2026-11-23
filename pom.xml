@@ -127,7 +127,7 @@
                     <excludes>
                         <exclude>hu/projekt/rushhour/Main.class</exclude>
                         <exclude>hu/projekt/rushhour/model/**</exclude>
-                        <exclude>hu/projekt/rushhour/ui/**</exclude>
+                        <exclude>hu/projekt/rushhour/ui/ConsoleRenderer.class</exclude>
                     </excludes>
                 </configuration>
                 <executions>
