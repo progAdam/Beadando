@@ -21,12 +21,10 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class BoardFileManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BoardFileManager.class);
     private static final String DEFAULT_RESOURCE = "/default-board.txt";
-
 
     public BoardState loadBoardOrDefault(Path filePath) {
         if (filePath != null && Files.exists(filePath) && Files.isRegularFile(filePath)) {
@@ -43,12 +41,10 @@ public class BoardFileManager {
         return loadDefaultBoard();
     }
 
-
     public BoardState loadBoardFromFile(Path filePath) throws IOException {
         List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
         return parseLines(lines);
     }
-
 
     public BoardState loadDefaultBoard() {
         try (InputStream is = getClass().getResourceAsStream(DEFAULT_RESOURCE)) {
@@ -62,7 +58,6 @@ public class BoardFileManager {
         }
         return createHardcodedDefaultBoard();
     }
-
 
     public void saveBoardToFile(BoardState state, Path filePath) throws IOException {
         List<String> lines = new ArrayList<>();
@@ -106,25 +101,29 @@ public class BoardFileManager {
                 continue;
             }
             String[] parts = line.split("\\s+");
-            switch (parts[0].toUpperCase()) {
-                case "ROWS" -> rows = Integer.parseInt(parts[1]);
-                case "COLS" -> cols = Integer.parseInt(parts[1]);
-                case "EXIT_A" -> exitA = new ExitPoint(
-                        new Position(Integer.parseInt(parts[1]), Integer.parseInt(parts[2])),
-                        Direction.valueOf(parts[3].toUpperCase())
-                );
-                case "EXIT_B" -> exitB = new ExitPoint(
-                        new Position(Integer.parseInt(parts[1]), Integer.parseInt(parts[2])),
-                        Direction.valueOf(parts[3].toUpperCase())
-                );
-                case "VEHICLE" -> vehicles.add(new Vehicle(
-                        parts[1],
-                        new Position(Integer.parseInt(parts[2]), Integer.parseInt(parts[3])),
-                        Integer.parseInt(parts[4]),
-                        Orientation.valueOf(parts[5].toUpperCase()),
-                        VehicleRole.valueOf(parts[6].toUpperCase())
-                ));
-                default -> throw new IOException("Unknown directive in board file: " + parts[0]);
+            try {
+                switch (parts[0].toUpperCase()) {
+                    case "ROWS" -> rows = Integer.parseInt(parts[1]);
+                    case "COLS" -> cols = Integer.parseInt(parts[1]);
+                    case "EXIT_A" -> exitA = new ExitPoint(
+                            new Position(Integer.parseInt(parts[1]), Integer.parseInt(parts[2])),
+                            Direction.valueOf(parts[3].toUpperCase())
+                    );
+                    case "EXIT_B" -> exitB = new ExitPoint(
+                            new Position(Integer.parseInt(parts[1]), Integer.parseInt(parts[2])),
+                            Direction.valueOf(parts[3].toUpperCase())
+                    );
+                    case "VEHICLE" -> vehicles.add(new Vehicle(
+                            parts[1],
+                            new Position(Integer.parseInt(parts[2]), Integer.parseInt(parts[3])),
+                            Integer.parseInt(parts[4]),
+                            Orientation.valueOf(parts[5].toUpperCase()),
+                            VehicleRole.valueOf(parts[6].toUpperCase())
+                    ));
+                    default -> throw new IOException("Unknown directive in board file: " + parts[0]);
+                }
+            } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+                throw new IOException("Hibás formátum a pályafájlban ('" + line + "'): " + e.getMessage(), e);
             }
         }
 

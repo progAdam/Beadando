@@ -13,12 +13,13 @@ import hu.projekt.rushhour.ui.ConsoleRenderer;
 import hu.projekt.rushhour.ui.ParsedCommand;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 public class Game {
 
@@ -56,7 +57,6 @@ public class Game {
         this.initialBoardPath = initialBoardPath;
     }
 
-
     public void start() {
         renderer.printMessage("=== RUSH HOUR NxM (2 Játékos) ===");
         renderer.printMessage("Add meg a játékosneved: ");
@@ -89,13 +89,12 @@ public class Game {
                 } else if (command instanceof ParsedCommand.HighScoreCommand) {
                     renderer.renderHighScores(highScoreDao.getTopScores());
                 } else if (command instanceof ParsedCommand.LoadBoardCommand loadCmd) {
-                    try {
-                        boardState = boardFileManager.loadBoardFromFile(Path.of(loadCmd.filePath()));
+                    BoardState loaded = loadBoardSafely(loadCmd.filePath());
+                    if (loaded != null) {
+                        boardState = loaded;
                         currentTurn = PlayerTurn.HUMAN;
                         turnCount = 1;
                         renderer.printMessage("Pálya sikeresen betöltve: " + loadCmd.filePath());
-                    } catch (IOException e) {
-                        renderer.printMessage("Hiba a pálya betöltésekor: " + e.getMessage());
                     }
                 } else if (command instanceof ParsedCommand.SaveBoardCommand saveCmd) {
                     try {
@@ -120,14 +119,17 @@ public class Game {
                         turnCount = restored.turnCount();
                         boardState = restored.boardState();
                         renderer.printMessage("Játékállás sikeresen visszatöltve XML-ből: " + loadXmlCmd.filePath());
-                    } catch (IOException e) {
+                    } catch (NoSuchFileException e) {
+                        renderer.printMessage("Hiba az XML visszatöltésekor: a fájl nem található ("
+                                + loadXmlCmd.filePath() + ")");
+                    } catch (IOException | IllegalArgumentException e) {
                         renderer.printMessage("Hiba az XML visszatöltésekor: " + e.getMessage());
                     }
                 } else if (command instanceof ParsedCommand.InvalidCommand invalidCmd) {
                     renderer.printMessage("Hiba: " + invalidCmd.reason());
                 } else if (command instanceof ParsedCommand.MoveCommand moveCmd) {
                     try {
-                        MoveOutcome outcome = gameEngine.applyMove(boardState, moveCmd.move());
+                        MoveOutcome outcome = gameEngine.applyMove(boardState, moveCmd.move(), PlayerTurn.HUMAN);
                         boardState = outcome.nextState();
                         if (outcome.winner().isPresent()) {
                             handleVictory(outcome.winner().get(), playerName, boardState);
@@ -136,12 +138,12 @@ public class Game {
                         currentTurn = PlayerTurn.AI;
                     } catch (IllegalArgumentException e) {
                         renderer.printMessage("Érvénytelen lépés! Az út akadályozott, rossz az irány, "
-                                + "vagy elhagynád a pályát.");
+                                + "vagy nem engedélyezett kijáratot használnál.");
                     }
                 }
             } else {
                 renderer.printMessage(String.format("[%d. kör - Gépi játékos (B)] Gondolkodik...", turnCount));
-                Optional<Move> aiMoveOpt = aiPlayer.chooseMove(boardState);
+                Optional<Move> aiMoveOpt = chooseLegalAiMove(boardState);
                 if (aiMoveOpt.isEmpty()) {
                     renderer.printMessage("A gépi játékosnak nincs lehetséges lépése! Döntetlen.");
                     break;
@@ -149,7 +151,7 @@ public class Game {
                 Move aiMove = aiMoveOpt.get();
                 renderer.printMessage(String.format("Gépi játékos lépése: %s %s %d",
                         aiMove.vehicleId(), aiMove.direction(), aiMove.steps()));
-                MoveOutcome outcome = gameEngine.applyMove(boardState, aiMove);
+                MoveOutcome outcome = gameEngine.applyMove(boardState, aiMove, PlayerTurn.AI);
                 boardState = outcome.nextState();
                 if (outcome.winner().isPresent()) {
                     handleVictory(outcome.winner().get(), playerName, boardState);
@@ -159,6 +161,29 @@ public class Game {
                 turnCount++;
             }
         }
+    }
+
+    private Optional<Move> chooseLegalAiMove(BoardState boardState) {
+        Optional<Move> chosen = aiPlayer.chooseMove(boardState);
+        if (chosen.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Move> legalAiMoves = gameEngine.getAllValidMoves(boardState, PlayerTurn.AI);
+        if (legalAiMoves.contains(chosen.get())) {
+            return chosen;
+        }
+        return legalAiMoves.isEmpty() ? Optional.empty() : Optional.of(legalAiMoves.getFirst());
+    }
+
+    private BoardState loadBoardSafely(String filePath) {
+        try {
+            return boardFileManager.loadBoardFromFile(Path.of(filePath));
+        } catch (NoSuchFileException e) {
+            renderer.printMessage("Hiba a pálya betöltésekor: a fájl nem található (" + filePath + ")");
+        } catch (IOException | IllegalArgumentException e) {
+            renderer.printMessage("Hiba a pálya betöltésekor: " + e.getMessage());
+        }
+        return null;
     }
 
     private void handleVictory(PlayerTurn winner, String playerName, BoardState finalState) {
