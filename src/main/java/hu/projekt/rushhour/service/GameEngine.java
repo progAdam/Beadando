@@ -15,7 +15,6 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class GameEngine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GameEngine.class);
@@ -26,8 +25,12 @@ public class GameEngine {
         this.moveValidator = Objects.requireNonNull(moveValidator, "MoveValidator must not be null");
     }
 
-
     public MoveOutcome applyMove(BoardState state, Move move) {
+        return applyMove(state, move, PlayerTurn.HUMAN);
+    }
+
+    public MoveOutcome applyMove(BoardState state, Move move, PlayerTurn currentTurn) {
+        Objects.requireNonNull(currentTurn, "PlayerTurn must not be null");
         if (!moveValidator.isValidMove(state, move)) {
             throw new IllegalArgumentException("Invalid move: " + move);
         }
@@ -46,14 +49,17 @@ public class GameEngine {
             }
         }
 
+        if (exited && !isOwnTargetVehicle(vehicle, currentTurn)) {
+            throw new IllegalArgumentException(
+                    "Opponent's target vehicle cannot be moved out of the board: " + move);
+        }
+
         Vehicle movedVehicle = vehicle.move(move.direction(), appliedSteps);
         BoardState nextState = state.withUpdatedVehicle(movedVehicle);
 
         Optional<PlayerTurn> winner = Optional.empty();
         if (exited) {
-            winner = vehicle.role() == VehicleRole.HUMAN
-                    ? Optional.of(PlayerTurn.HUMAN)
-                    : Optional.of(PlayerTurn.AI);
+            winner = Optional.of(currentTurn);
             LOGGER.info("Hero vehicle {} exited the board! Winner: {}", vehicle.id(), winner.get());
         } else {
             LOGGER.info("Applied move: {} {} {}", move.vehicleId(), move.direction(), appliedSteps);
@@ -62,8 +68,11 @@ public class GameEngine {
         return new MoveOutcome(nextState, winner);
     }
 
-
     public List<Move> getValidMovesForVehicle(BoardState state, String vehicleId) {
+        return getValidMovesForVehicle(state, vehicleId, null);
+    }
+
+    public List<Move> getValidMovesForVehicle(BoardState state, String vehicleId, PlayerTurn currentTurn) {
         Optional<Vehicle> vehicleOpt = state.findVehicle(vehicleId);
         if (vehicleOpt.isEmpty()) {
             return List.of();
@@ -79,12 +88,15 @@ public class GameEngine {
             for (int steps = 1; steps <= maxDistance; steps++) {
                 Move candidate = new Move(vehicle.id(), dir, steps);
                 if (moveValidator.isValidMove(state, candidate)) {
-                    validMoves.add(candidate);
                     Vehicle stepped = vehicle.move(dir, steps);
                     ExitPoint exit = moveValidator.getHeroExitForVehicle(state, vehicle);
                     if (moveValidator.isHeroExitingThroughGate(stepped, dir, exit)) {
+                        if (currentTurn == null || isOwnTargetVehicle(vehicle, currentTurn)) {
+                            validMoves.add(candidate);
+                        }
                         break;
                     }
+                    validMoves.add(candidate);
                 } else {
                     break;
                 }
@@ -93,12 +105,20 @@ public class GameEngine {
         return List.copyOf(validMoves);
     }
 
-
     public List<Move> getAllValidMoves(BoardState state) {
+        return getAllValidMoves(state, null);
+    }
+
+    public List<Move> getAllValidMoves(BoardState state, PlayerTurn currentTurn) {
         List<Move> allMoves = new ArrayList<>();
         for (Vehicle vehicle : state.vehicles()) {
-            allMoves.addAll(getValidMovesForVehicle(state, vehicle.id()));
+            allMoves.addAll(getValidMovesForVehicle(state, vehicle.id(), currentTurn));
         }
         return List.copyOf(allMoves);
+    }
+
+    private boolean isOwnTargetVehicle(Vehicle vehicle, PlayerTurn currentTurn) {
+        return (currentTurn == PlayerTurn.HUMAN && vehicle.role() == VehicleRole.HUMAN)
+                || (currentTurn == PlayerTurn.AI && vehicle.role() == VehicleRole.AI);
     }
 }
